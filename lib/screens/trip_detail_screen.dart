@@ -5,9 +5,11 @@ import '../models/enums.dart';
 import '../models/item_model.dart';
 import '../models/trip_model.dart';
 import '../models/home_check_model.dart';
+import '../models/pre_trip_preparation_model.dart';
 import '../providers/app_provider.dart';
 import '../widgets/item_tile.dart';
 import 'home_checks_screen.dart';
+import 'pre_trip_preparations_screen.dart';
 
 class TripDetailScreen extends StatefulWidget {
   final String tripId;
@@ -23,7 +25,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> with SingleTickerPr
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
         setState(() {});
@@ -40,7 +42,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> with SingleTickerPr
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isFirstTab = _tabController.index == 0;
+    final activeIndex = _tabController.index;
 
     return Consumer<AppProvider>(
       builder: (context, provider, _) {
@@ -76,14 +78,15 @@ class _TripDetailScreenState extends State<TripDetailScreen> with SingleTickerPr
                     labelColor: theme.colorScheme.primary,
                     unselectedLabelColor: Colors.white54,
                     indicatorWeight: 3,
+                    labelPadding: EdgeInsets.zero,
                     tabs: [
                       Tab(
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.luggage, size: 18, color: _tabController.index == 0 ? Colors.blueAccent : Colors.white54),
-                            const SizedBox(width: 8),
-                            const Text('Eşyalar'),
+                            Icon(Icons.assignment_turned_in, size: 16, color: _tabController.index == 0 ? Colors.purpleAccent : Colors.white54),
+                            const SizedBox(width: 4),
+                            const Text('Hazırlık', style: TextStyle(fontSize: 12)),
                           ],
                         ),
                       ),
@@ -91,9 +94,19 @@ class _TripDetailScreenState extends State<TripDetailScreen> with SingleTickerPr
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.home_work, size: 18, color: _tabController.index == 1 ? Colors.orangeAccent : Colors.white54),
-                            const SizedBox(width: 8),
-                            const Text('Ev Kontrol'),
+                            Icon(Icons.luggage, size: 16, color: _tabController.index == 1 ? Colors.blueAccent : Colors.white54),
+                            const SizedBox(width: 4),
+                            const Text('Eşyalar', style: TextStyle(fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                      Tab(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.home_work, size: 16, color: _tabController.index == 2 ? Colors.orangeAccent : Colors.white54),
+                            const SizedBox(width: 4),
+                            const Text('Ev Kontrol', style: TextStyle(fontSize: 12)),
                           ],
                         ),
                       ),
@@ -106,16 +119,25 @@ class _TripDetailScreenState extends State<TripDetailScreen> with SingleTickerPr
             body: TabBarView(
               controller: _tabController,
               children: [
+                _PreTripPreparationsTab(trip: trip),
                 _PackingListTab(trip: trip),
                 _HomeChecksTab(trip: trip),
               ],
             ),
           ),
           floatingActionButton: FloatingActionButton.extended(
-            onPressed: () => isFirstTab ? _showAddItemDialog(context, trip.id) : _showAddCheckDialog(context, trip.id),
+            onPressed: () {
+              if (activeIndex == 0) {
+                _showAddPrepDialog(context, trip.id);
+              } else if (activeIndex == 1) {
+                _showAddItemDialog(context, trip.id);
+              } else {
+                _showAddCheckDialog(context, trip.id);
+              }
+            },
             icon: const Icon(Icons.add),
-            label: Text(isFirstTab ? 'Eşya Ekle' : 'Kontrol Ekle'),
-            backgroundColor: isFirstTab ? Colors.blueAccent : Colors.orangeAccent,
+            label: Text(activeIndex == 0 ? 'Hazırlık Ekle' : (activeIndex == 1 ? 'Eşya Ekle' : 'Kontrol Ekle')),
+            backgroundColor: activeIndex == 0 ? Colors.purpleAccent : (activeIndex == 1 ? Colors.blueAccent : Colors.orangeAccent),
             foregroundColor: Colors.white,
           ),
         );
@@ -222,6 +244,61 @@ class _TripDetailScreenState extends State<TripDetailScreen> with SingleTickerPr
               onPressed: () {
                 if (controller.text.isNotEmpty) {
                   context.read<AppProvider>().addCustomCheckToTrip(tripId, controller.text.trim(), selectedCategory);
+                  Navigator.pop(ctx);
+                }
+              },
+              child: const Text('Ekle', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAddPrepDialog(BuildContext context, String tripId) {
+    final controller = TextEditingController();
+    PreTripPreparationCategory selectedCategory = PreTripPreparationCategory.travelPrep;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          backgroundColor: const Color(0xFF1E1E1E),
+          title: const Text('Yeni Hazırlık Ekle', style: TextStyle(color: Colors.white)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: controller,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  hintText: 'Hazırlık adı...',
+                  hintStyle: TextStyle(color: Colors.white38),
+                ),
+                autofocus: true,
+              ),
+              const SizedBox(height: 16),
+              DropdownButton<PreTripPreparationCategory>(
+                value: selectedCategory,
+                isExpanded: true,
+                dropdownColor: const Color(0xFF1E1E1E),
+                items: PreTripPreparationCategory.values.map((c) => DropdownMenuItem(
+                  value: c, 
+                  child: Text(c.label, style: const TextStyle(color: Colors.white))
+                )).toList(),
+                onChanged: (val) {
+                  if (val != null) setState(() => selectedCategory = val);
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('İptal')),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: Colors.purpleAccent),
+              onPressed: () {
+                if (controller.text.isNotEmpty) {
+                  context.read<AppProvider>().addCustomPreTripPreparationToTrip(tripId, controller.text.trim(), selectedCategory);
                   Navigator.pop(ctx);
                 }
               },
@@ -415,6 +492,16 @@ class _HomeChecksTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return HomeChecksScreen(tripId: trip.id);
+  }
+}
+
+class _PreTripPreparationsTab extends StatelessWidget {
+  final Trip trip;
+  const _PreTripPreparationsTab({required this.trip});
+
+  @override
+  Widget build(BuildContext context) {
+    return PreTripPreparationsScreen(tripId: trip.id);
   }
 }
 

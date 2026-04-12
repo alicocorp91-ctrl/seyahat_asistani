@@ -6,7 +6,6 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'providers/app_provider.dart';
 import 'screens/home_screen.dart';
 import 'theme/app_theme.dart';
-import 'models/enums.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,9 +26,8 @@ class MyApp extends StatelessWidget {
           return MaterialApp(
             title: 'Seyahat Asistanı',
             debugShowCheckedModeBanner: false,
-            theme: AppTheme.getTheme(Gender.male),
-            darkTheme: AppTheme.getTheme(Gender.male),
-            themeMode: ThemeMode.dark,
+            theme: AppTheme.getTheme(provider.currentTheme),
+            themeMode: ThemeMode.dark, // Uygulama karanlık tabanlı temalar kullanıyor
             localizationsDelegates: const [
               GlobalMaterialLocalizations.delegate,
               GlobalWidgetsLocalizations.delegate,

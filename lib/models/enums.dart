@@ -272,3 +272,41 @@ enum HomeCheckCategory {
     }
   }
 }
+
+enum PreTripPreparationCategory {
+  personalCare,
+  finance,
+  electronics,
+  shopping,
+  travelPrep;
+
+  String get label {
+    switch (this) {
+      case PreTripPreparationCategory.personalCare: return 'Kişisel Bakım';
+      case PreTripPreparationCategory.finance: return 'Finans';
+      case PreTripPreparationCategory.electronics: return 'Elektronik';
+      case PreTripPreparationCategory.shopping: return 'Alışveriş';
+      case PreTripPreparationCategory.travelPrep: return 'Seyahat Hazırlığı';
+    }
+  }
+
+  Color get color {
+    switch (this) {
+      case PreTripPreparationCategory.personalCare: return Colors.pinkAccent;
+      case PreTripPreparationCategory.finance: return Colors.greenAccent;
+      case PreTripPreparationCategory.electronics: return Colors.blueAccent;
+      case PreTripPreparationCategory.shopping: return Colors.orangeAccent;
+      case PreTripPreparationCategory.travelPrep: return Colors.purpleAccent;
+    }
+  }
+
+  IconData get iconData {
+    switch (this) {
+      case PreTripPreparationCategory.personalCare: return Icons.face;
+      case PreTripPreparationCategory.finance: return Icons.account_balance_wallet;
+      case PreTripPreparationCategory.electronics: return Icons.battery_charging_full;
+      case PreTripPreparationCategory.shopping: return Icons.shopping_cart;
+      case PreTripPreparationCategory.travelPrep: return Icons.map;
+    }
+  }
+}

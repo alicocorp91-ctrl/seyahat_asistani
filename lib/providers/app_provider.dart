@@ -6,21 +6,29 @@ import '../models/enums.dart';
 import '../models/item_model.dart';
 import '../models/trip_model.dart';
 import '../models/home_check_model.dart';
+import '../models/pre_trip_preparation_model.dart';
 import '../data/default_items.dart';
 import '../data/default_home_checks.dart';
+import '../data/default_pre_trip_preparations.dart';
+import '../theme/app_theme.dart';
 
 class AppProvider extends ChangeNotifier {
   List<PackingItem> _allItems = [];
   List<HomeCheck> _allHomeChecks = [];
+  List<PreTripPreparation> _allPreTripPreparations = [];
   List<Trip> _trips = [];
   Map<String, bool> _itemActiveStatus = {};
   Map<String, bool> _checkActiveStatus = {};
+  Map<String, bool> _preparationActiveStatus = {};
   bool _isLoading = true;
+  AppThemeMode _currentTheme = AppThemeMode.classicDark;
 
   List<PackingItem> get allItems => _allItems;
   List<HomeCheck> get allHomeChecks => _allHomeChecks;
+  List<PreTripPreparation> get allPreTripPreparations => _allPreTripPreparations;
   List<Trip> get trips => _trips;
   bool get isLoading => _isLoading;
+  AppThemeMode get currentTheme => _currentTheme;
 
   final _uuid = const Uuid();
 
@@ -29,6 +37,10 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
 
     final prefs = await SharedPreferences.getInstance();
+
+    // Theme
+    final themeIndex = prefs.getInt('app_theme_index') ?? 0;
+    _currentTheme = AppThemeMode.values[themeIndex];
 
     // Item active status
     final itemStatusJson = prefs.getString('item_status');
@@ -40,6 +52,12 @@ class AppProvider extends ChangeNotifier {
     final checkStatusJson = prefs.getString('check_status');
     if (checkStatusJson != null) {
       _checkActiveStatus = Map<String, bool>.from(jsonDecode(checkStatusJson));
+    }
+
+    // Preparation active status
+    final preparationStatusJson = prefs.getString('preparation_status');
+    if (preparationStatusJson != null) {
+      _preparationActiveStatus = Map<String, bool>.from(jsonDecode(preparationStatusJson));
     }
 
     // Custom items
@@ -64,12 +82,27 @@ class AppProvider extends ChangeNotifier {
       customChecks = (jsonDecode(customChecksJson) as List).map((e) => HomeCheck.fromJson(e)).toList();
     }
 
-    // Merge default + custom checks - FORCE DEFAULT STATUS IF NOT IN PREFS
+    // Merge default + custom checks
     _allHomeChecks = [
       ...defaultHomeChecks.map((check) => check.copyWith(
         isActive: _checkActiveStatus[check.id] ?? check.isActive,
       )),
       ...customChecks,
+    ];
+
+    // Custom pre trip preparations
+    final customPreparationsJson = prefs.getString('custom_preparations');
+    List<PreTripPreparation> customPreparations = [];
+    if (customPreparationsJson != null) {
+      customPreparations = (jsonDecode(customPreparationsJson) as List).map((e) => PreTripPreparation.fromJson(e)).toList();
+    }
+
+    // Merge default + custom preparations
+    _allPreTripPreparations = [
+      ...defaultPreTripPreparations.map((prep) => prep.copyWith(
+        isActive: _preparationActiveStatus[prep.id] ?? prep.isActive,
+      )),
+      ...customPreparations,
     ];
 
     // Trips
@@ -79,6 +112,13 @@ class AppProvider extends ChangeNotifier {
     }
 
     _isLoading = false;
+    notifyListeners();
+  }
+
+  Future<void> setTheme(AppThemeMode mode) async {
+    _currentTheme = mode;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('app_theme_index', mode.index);
     notifyListeners();
   }
 
@@ -97,6 +137,11 @@ class AppProvider extends ChangeNotifier {
     await prefs.setString('check_status', jsonEncode(_checkActiveStatus));
   }
 
+  Future<void> _savePreparationStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('preparation_status', jsonEncode(_preparationActiveStatus));
+  }
+
   Future<void> _saveCustomItems() async {
     final prefs = await SharedPreferences.getInstance();
     final customItems = _allItems.where((i) => i.isCustom).toList();
@@ -107,6 +152,12 @@ class AppProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     final customChecks = _allHomeChecks.where((c) => c.isCustom).toList();
     await prefs.setString('custom_checks', jsonEncode(customChecks.map((e) => e.toJson()).toList()));
+  }
+
+  Future<void> _saveCustomPreparations() async {
+    final prefs = await SharedPreferences.getInstance();
+    final customPreparations = _allPreTripPreparations.where((p) => p.isCustom).toList();
+    await prefs.setString('custom_preparations', jsonEncode(customPreparations.map((e) => e.toJson()).toList()));
   }
 
   // Toggle item active
@@ -131,6 +182,19 @@ class AppProvider extends ChangeNotifier {
       _checkActiveStatus[id] = _allHomeChecks[index].isActive;
       await _saveCheckStatus();
       if (check.isCustom) await _saveCustomChecks();
+      notifyListeners();
+    }
+  }
+
+  // Toggle preparation active
+  Future<void> togglePreparationActive(String id) async {
+    final index = _allPreTripPreparations.indexWhere((p) => p.id == id);
+    if (index != -1) {
+      final preparation = _allPreTripPreparations[index];
+      _allPreTripPreparations[index] = preparation.copyWith(isActive: !preparation.isActive);
+      _preparationActiveStatus[id] = _allPreTripPreparations[index].isActive;
+      await _savePreparationStatus();
+      if (preparation.isCustom) await _saveCustomPreparations();
       notifyListeners();
     }
   }
@@ -161,6 +225,10 @@ class AppProvider extends ChangeNotifier {
 
     final tripHomeChecks = _allHomeChecks.where((c) => c.isActive).toList();
 
+    final tripPreTripPreparations = _allPreTripPreparations.where((p) => 
+      p.isActive && (tripType == TripType.international || !p.isForInternational)
+    ).toList();
+
     final trip = Trip(
       id: _uuid.v4(),
       name: name,
@@ -175,7 +243,9 @@ class AppProvider extends ChangeNotifier {
       createdAt: DateTime.now(),
       items: tripItems,
       homeChecks: tripHomeChecks,
+      preTripPreparations: tripPreTripPreparations,
       completedHomeChecks: [],
+      completedPreTripPreparations: [],
     );
 
     _trips.insert(0, trip);
@@ -184,12 +254,13 @@ class AppProvider extends ChangeNotifier {
     return trip;
   }
 
-  Future<void> updateTripInitialSelection(String tripId, List<TripItem> items, List<HomeCheck> checks) async {
+  Future<void> updateTripInitialSelection(String tripId, List<TripItem> items, List<HomeCheck> checks, List<PreTripPreparation> preparations) async {
     final index = _trips.indexWhere((t) => t.id == tripId);
     if (index != -1) {
       _trips[index] = _trips[index].copyWith(
         items: items,
         homeChecks: checks,
+        preTripPreparations: preparations,
       );
       await _saveTrips();
       notifyListeners();
@@ -229,6 +300,47 @@ class AppProvider extends ChangeNotifier {
       final newItem = TripItem(itemId: _uuid.v4(), name: name, category: category);
       final updatedItems = List<TripItem>.from(trip.items)..add(newItem);
       _trips[index] = trip.copyWith(items: updatedItems);
+      await _saveTrips();
+      notifyListeners();
+    }
+  }
+
+  // Pre Trip Preparation methods
+  Future<void> togglePreTripPreparation(String tripId, String prepId) async {
+    final index = _trips.indexWhere((t) => t.id == tripId);
+    if (index != -1) {
+      final trip = _trips[index];
+      final completed = List<String>.from(trip.completedPreTripPreparations);
+      if (completed.contains(prepId)) {
+        completed.remove(prepId);
+      } else {
+        completed.add(prepId);
+      }
+      _trips[index] = trip.copyWith(completedPreTripPreparations: completed);
+      await _saveTrips();
+      notifyListeners();
+    }
+  }
+
+  Future<void> removePreTripPreparationFromTrip(String tripId, String prepId) async {
+    final index = _trips.indexWhere((t) => t.id == tripId);
+    if (index != -1) {
+      final trip = _trips[index];
+      final updatedPreps = List<PreTripPreparation>.from(trip.preTripPreparations)..removeWhere((p) => p.id == prepId);
+      final updatedCompleted = List<String>.from(trip.completedPreTripPreparations)..remove(prepId);
+      _trips[index] = trip.copyWith(preTripPreparations: updatedPreps, completedPreTripPreparations: updatedCompleted);
+      await _saveTrips();
+      notifyListeners();
+    }
+  }
+
+  Future<void> addCustomPreTripPreparationToTrip(String tripId, String name, PreTripPreparationCategory category) async {
+    final index = _trips.indexWhere((t) => t.id == tripId);
+    if (index != -1) {
+      final trip = _trips[index];
+      final newPrep = PreTripPreparation(id: _uuid.v4(), name: name, category: category, isCustom: true);
+      final updatedPreps = List<PreTripPreparation>.from(trip.preTripPreparations)..add(newPrep);
+      _trips[index] = trip.copyWith(preTripPreparations: updatedPreps);
       await _saveTrips();
       notifyListeners();
     }
@@ -352,6 +464,19 @@ class AppProvider extends ChangeNotifier {
   Future<void> deleteCustomCheck(String id) async {
     _allHomeChecks.removeWhere((c) => c.id == id && c.isCustom);
     await _saveCustomChecks();
+    notifyListeners();
+  }
+
+  Future<void> addCustomPreparation(PreTripPreparation preparation) async {
+    final newPrep = preparation.copyWith(id: _uuid.v4(), isCustom: true, isActive: true);
+    _allPreTripPreparations.add(newPrep);
+    await _saveCustomPreparations();
+    notifyListeners();
+  }
+
+  Future<void> deleteCustomPreparation(String id) async {
+    _allPreTripPreparations.removeWhere((p) => p.id == id && p.isCustom);
+    await _saveCustomPreparations();
     notifyListeners();
   }
 

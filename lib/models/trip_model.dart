@@ -1,6 +1,7 @@
 import 'enums.dart';
 import 'item_model.dart';
 import 'home_check_model.dart';
+import 'pre_trip_preparation_model.dart';
 
 class Trip {
   final String id;
@@ -16,7 +17,9 @@ class Trip {
   final DateTime createdAt;
   final List<TripItem> items;
   final List<HomeCheck> homeChecks;
+  final List<PreTripPreparation> preTripPreparations;
   final List<String> completedHomeChecks;
+  final List<String> completedPreTripPreparations;
 
   const Trip({
     required this.id,
@@ -32,7 +35,9 @@ class Trip {
     required this.createdAt,
     required this.items,
     this.homeChecks = const [],
+    this.preTripPreparations = const [],
     this.completedHomeChecks = const [],
+    this.completedPreTripPreparations = const [],
   });
 
   Trip copyWith({
@@ -49,7 +54,9 @@ class Trip {
     DateTime? createdAt,
     List<TripItem>? items,
     List<HomeCheck>? homeChecks,
+    List<PreTripPreparation>? preTripPreparations,
     List<String>? completedHomeChecks,
+    List<String>? completedPreTripPreparations,
   }) => Trip(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -64,7 +71,9 @@ class Trip {
     createdAt: createdAt ?? this.createdAt,
     items: items ?? this.items,
     homeChecks: homeChecks ?? this.homeChecks,
+    preTripPreparations: preTripPreparations ?? this.preTripPreparations,
     completedHomeChecks: completedHomeChecks ?? this.completedHomeChecks,
+    completedPreTripPreparations: completedPreTripPreparations ?? this.completedPreTripPreparations,
   );
 
   int get days => endDate.difference(startDate).inDays + 1;
@@ -90,7 +99,9 @@ class Trip {
     'createdAt': createdAt.toIso8601String(),
     'items': items.map((i) => i.toJson()).toList(),
     'homeChecks': homeChecks.map((c) => c.toJson()).toList(),
+    'preTripPreparations': preTripPreparations.map((p) => p.toJson()).toList(),
     'completedHomeChecks': completedHomeChecks,
+    'completedPreTripPreparations': completedPreTripPreparations,
   };
 
   factory Trip.fromJson(Map<String, dynamic> json) => Trip(
@@ -107,6 +118,8 @@ class Trip {
     createdAt: DateTime.parse(json['createdAt'] as String),
     items: (json['items'] as List).map((i) => TripItem.fromJson(i)).toList(),
     homeChecks: (json['homeChecks'] as List?)?.map((c) => HomeCheck.fromJson(c)).toList() ?? [],
+    preTripPreparations: (json['preTripPreparations'] as List?)?.map((p) => PreTripPreparation.fromJson(p)).toList() ?? [],
     completedHomeChecks: (json['completedHomeChecks'] as List?)?.cast<String>() ?? [],
+    completedPreTripPreparations: (json['completedPreTripPreparations'] as List?)?.cast<String>() ?? [],
   );
 }

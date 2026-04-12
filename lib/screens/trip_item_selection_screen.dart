@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/enums.dart';
 import '../models/item_model.dart';
 import '../models/home_check_model.dart';
+import '../models/pre_trip_preparation_model.dart';
 import '../providers/app_provider.dart';
 import 'trip_detail_screen.dart';
 
@@ -19,14 +20,16 @@ class _TripItemSelectionScreenState extends State<TripItemSelectionScreen> with 
   late TabController _tabController;
   late List<TripItem> _allInitialItems;
   late List<HomeCheck> _allInitialChecks;
+  late List<PreTripPreparation> _allInitialPreparations;
   final List<String> _selectedItemIds = [];
   final List<String> _selectedCheckIds = [];
+  final List<String> _selectedPreparationIds = [];
   bool _initialized = false;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
   }
 
   void _initializeData(AppProvider provider) {
@@ -35,8 +38,10 @@ class _TripItemSelectionScreenState extends State<TripItemSelectionScreen> with 
     if (trip != null) {
       _allInitialItems = List.from(trip.items);
       _allInitialChecks = List.from(trip.homeChecks);
+      _allInitialPreparations = List.from(trip.preTripPreparations);
       _selectedItemIds.addAll(_allInitialItems.map((i) => i.itemId));
       _selectedCheckIds.addAll(_allInitialChecks.map((c) => c.id));
+      _selectedPreparationIds.addAll(_allInitialPreparations.map((p) => p.id));
       _initialized = true;
     }
   }
@@ -63,6 +68,7 @@ class _TripItemSelectionScreenState extends State<TripItemSelectionScreen> with 
           controller: _tabController,
           indicatorColor: Colors.blueAccent,
           tabs: const [
+            Tab(text: 'Hazırlıklar'),
             Tab(text: 'Eşya Önerileri'),
             Tab(text: 'Ev Kontrolleri'),
           ],
@@ -71,6 +77,7 @@ class _TripItemSelectionScreenState extends State<TripItemSelectionScreen> with 
       body: TabBarView(
         controller: _tabController,
         children: [
+          _buildPreparationsTab(),
           _buildItemsTab(),
           _buildChecksTab(),
         ],
@@ -238,13 +245,86 @@ class _TripItemSelectionScreenState extends State<TripItemSelectionScreen> with 
     );
   }
 
+  Widget _buildPreparationsTab() {
+    final Map<PreTripPreparationCategory, List<PreTripPreparation>> grouped = {};
+    for (final prep in _allInitialPreparations) {
+      grouped.putIfAbsent(prep.category, () => []).add(prep);
+    }
+    final categories = grouped.keys.toList()..sort((a, b) => a.index.compareTo(b.index));
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: categories.length,
+      itemBuilder: (context, index) {
+        final category = categories[index];
+        final preps = grouped[category]!;
+        final allCategorySelected = preps.every((p) => _selectedPreparationIds.contains(p.id));
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+              child: Row(
+                children: [
+                  Icon(category.iconData, color: category.color, size: 20),
+                  const SizedBox(width: 8),
+                  Text(category.label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        if (allCategorySelected) {
+                          for (var p in preps) {
+                            _selectedPreparationIds.remove(p.id);
+                          }
+                        } else {
+                          for (var p in preps) {
+                            if (!_selectedPreparationIds.contains(p.id)) {
+                              _selectedPreparationIds.add(p.id);
+                            }
+                          }
+                        }
+                      });
+                    },
+                    icon: Icon(allCategorySelected ? Icons.remove_circle_outline : Icons.add_circle_outline, size: 16, color: category.color),
+                    label: Text(allCategorySelected ? 'Tümünü Çıkar' : 'Tümünü Seç', style: TextStyle(color: category.color, fontSize: 12)),
+                  ),
+                ],
+              ),
+            ),
+            ...preps.map((prep) {
+              final isSelected = _selectedPreparationIds.contains(prep.id);
+              return _SelectionTile(
+                title: prep.name,
+                isSelected: isSelected,
+                color: category.color,
+                onToggle: () {
+                  setState(() {
+                    if (isSelected) {
+                      _selectedPreparationIds.remove(prep.id);
+                    } else {
+                      _selectedPreparationIds.add(prep.id);
+                    }
+                  });
+                },
+              );
+            }),
+            const SizedBox(height: 16),
+          ],
+        );
+      },
+    );
+  }
+
   void _finalizeList() {
     HapticFeedback.heavyImpact();
     
     final finalItems = _allInitialItems.where((i) => _selectedItemIds.contains(i.itemId)).toList();
     final finalChecks = _allInitialChecks.where((c) => _selectedCheckIds.contains(c.id)).toList();
+    final finalPreparations = _allInitialPreparations.where((p) => _selectedPreparationIds.contains(p.id)).toList();
 
-    context.read<AppProvider>().updateTripInitialSelection(widget.tripId, finalItems, finalChecks);
+    context.read<AppProvider>().updateTripInitialSelection(widget.tripId, finalItems, finalChecks, finalPreparations);
     
     Navigator.pushReplacement(
       context, 
