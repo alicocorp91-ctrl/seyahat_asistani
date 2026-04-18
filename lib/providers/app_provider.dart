@@ -11,6 +11,7 @@ import '../data/default_items.dart';
 import '../data/default_home_checks.dart';
 import '../data/default_pre_trip_preparations.dart';
 import '../theme/app_theme.dart';
+import '../services/notification_service.dart';
 
 class AppProvider extends ChangeNotifier {
   List<PackingItem> _allItems = [];
@@ -31,6 +32,7 @@ class AppProvider extends ChangeNotifier {
   AppThemeMode get currentTheme => _currentTheme;
 
   final _uuid = const Uuid();
+  final _notificationService = NotificationService();
 
   Future<void> init() async {
     _isLoading = true;
@@ -311,14 +313,63 @@ class AppProvider extends ChangeNotifier {
     if (index != -1) {
       final trip = _trips[index];
       final completed = List<String>.from(trip.completedPreTripPreparations);
+      bool isNowCompleted = false;
       if (completed.contains(prepId)) {
         completed.remove(prepId);
       } else {
         completed.add(prepId);
+        isNowCompleted = true;
       }
+      
       _trips[index] = trip.copyWith(completedPreTripPreparations: completed);
+      
+      // If completed, cancel notification
+      if (isNowCompleted) {
+        _notificationService.cancelNotification((tripId + prepId).hashCode);
+      } else {
+        // If uncompleted and has schedule, reschedule
+        final prep = trip.preTripPreparations.firstWhere((p) => p.id == prepId);
+        if (prep.scheduledDate != null && prep.isNotificationEnabled) {
+          _notificationService.scheduleNotification(
+            id: (tripId + prepId).hashCode,
+            title: 'Hazırlık Hatırlatıcısı',
+            body: '${prep.name} zamanı geldi!',
+            scheduledDate: prep.scheduledDate!,
+          );
+        }
+      }
+
       await _saveTrips();
       notifyListeners();
+    }
+  }
+
+  Future<void> updatePreTripPreparation(String tripId, PreTripPreparation updatedPrep) async {
+    final index = _trips.indexWhere((t) => t.id == tripId);
+    if (index != -1) {
+      final trip = _trips[index];
+      final updatedPreps = List<PreTripPreparation>.from(trip.preTripPreparations);
+      final prepIndex = updatedPreps.indexWhere((p) => p.id == updatedPrep.id);
+      if (prepIndex != -1) {
+        updatedPreps[prepIndex] = updatedPrep;
+        _trips[index] = trip.copyWith(preTripPreparations: updatedPreps);
+
+        // Update notification
+        final notificationId = (tripId + updatedPrep.id).hashCode;
+        if (updatedPrep.scheduledDate != null && updatedPrep.isNotificationEnabled && !trip.completedPreTripPreparations.contains(updatedPrep.id)) {
+          _notificationService.scheduleNotification(
+            id: notificationId,
+            title: 'Hazırlık Hatırlatıcısı',
+            body: '${updatedPrep.name} zamanı geldi!',
+            scheduledDate: updatedPrep.scheduledDate!,
+          );
+        } else {
+          _notificationService.cancelNotification(notificationId);
+        }
+
+        await _saveTrips();
+        notifyListeners();
+      }
     }
   }
 
@@ -329,6 +380,9 @@ class AppProvider extends ChangeNotifier {
       final updatedPreps = List<PreTripPreparation>.from(trip.preTripPreparations)..removeWhere((p) => p.id == prepId);
       final updatedCompleted = List<String>.from(trip.completedPreTripPreparations)..remove(prepId);
       _trips[index] = trip.copyWith(preTripPreparations: updatedPreps, completedPreTripPreparations: updatedCompleted);
+      
+      _notificationService.cancelNotification((tripId + prepId).hashCode);
+
       await _saveTrips();
       notifyListeners();
     }
@@ -435,6 +489,12 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> deleteTrip(String id) async {
+    final trip = getTripById(id);
+    if (trip != null) {
+      for (final prep in trip.preTripPreparations) {
+        _notificationService.cancelNotification((id + prep.id).hashCode);
+      }
+    }
     _trips.removeWhere((t) => t.id == id);
     await _saveTrips();
     notifyListeners();

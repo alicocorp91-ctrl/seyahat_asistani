@@ -7,6 +7,8 @@ class PreTripPreparation {
   final bool isForInternational; // true if only for international trips
   final bool isCustom;
   final bool isActive;
+  final DateTime? scheduledDate;
+  final bool isNotificationEnabled;
 
   const PreTripPreparation({
     required this.id,
@@ -15,6 +17,8 @@ class PreTripPreparation {
     this.isForInternational = false,
     this.isCustom = false,
     this.isActive = true,
+    this.scheduledDate,
+    this.isNotificationEnabled = false,
   });
 
   PreTripPreparation copyWith({
@@ -24,6 +28,9 @@ class PreTripPreparation {
     bool? isForInternational,
     bool? isCustom,
     bool? isActive,
+    DateTime? scheduledDate,
+    bool? isNotificationEnabled,
+    bool clearScheduledDate = false,
   }) => PreTripPreparation(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -31,6 +38,8 @@ class PreTripPreparation {
     isForInternational: isForInternational ?? this.isForInternational,
     isCustom: isCustom ?? this.isCustom,
     isActive: isActive ?? this.isActive,
+    scheduledDate: clearScheduledDate ? null : (scheduledDate ?? this.scheduledDate),
+    isNotificationEnabled: clearScheduledDate ? false : (isNotificationEnabled ?? this.isNotificationEnabled),
   );
 
   Map<String, dynamic> toJson() => {
@@ -40,6 +49,8 @@ class PreTripPreparation {
     'isForInternational': isForInternational,
     'isCustom': isCustom,
     'isActive': isActive,
+    'scheduledDate': scheduledDate?.toIso8601String(),
+    'isNotificationEnabled': isNotificationEnabled,
   };
 
   factory PreTripPreparation.fromJson(Map<String, dynamic> json) => PreTripPreparation(
@@ -49,5 +60,7 @@ class PreTripPreparation {
     isForInternational: json['isForInternational'] as bool? ?? false,
     isCustom: json['isCustom'] as bool? ?? false,
     isActive: json['isActive'] as bool? ?? true,
+    scheduledDate: json['scheduledDate'] != null ? DateTime.parse(json['scheduledDate'] as String) : null,
+    isNotificationEnabled: json['isNotificationEnabled'] as bool? ?? false,
   );
 }
