@@ -1,10 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'enums.dart';
 
 class PreTripPreparation {
   final String id;
   final String name;
   final PreTripPreparationCategory category;
-  final bool isForInternational; // true if only for international trips
+  final bool isForInternational;
   final bool isCustom;
   final bool isActive;
   final DateTime? scheduledDate;
@@ -31,36 +32,78 @@ class PreTripPreparation {
     DateTime? scheduledDate,
     bool? isNotificationEnabled,
     bool clearScheduledDate = false,
-  }) => PreTripPreparation(
-    id: id ?? this.id,
-    name: name ?? this.name,
-    category: category ?? this.category,
-    isForInternational: isForInternational ?? this.isForInternational,
-    isCustom: isCustom ?? this.isCustom,
-    isActive: isActive ?? this.isActive,
-    scheduledDate: clearScheduledDate ? null : (scheduledDate ?? this.scheduledDate),
-    isNotificationEnabled: clearScheduledDate ? false : (isNotificationEnabled ?? this.isNotificationEnabled),
-  );
+  }) =>
+      PreTripPreparation(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        category: category ?? this.category,
+        isForInternational: isForInternational ?? this.isForInternational,
+        isCustom: isCustom ?? this.isCustom,
+        isActive: isActive ?? this.isActive,
+        scheduledDate:
+            clearScheduledDate ? null : (scheduledDate ?? this.scheduledDate),
+        isNotificationEnabled: clearScheduledDate
+            ? false
+            : (isNotificationEnabled ?? this.isNotificationEnabled),
+      );
+
+  // ✅ clearScheduledDate için yardımcı metod
+  PreTripPreparation clearSchedule() => copyWith(clearScheduledDate: true);
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
-    'category': category.index,
-    'isForInternational': isForInternational,
-    'isCustom': isCustom,
-    'isActive': isActive,
-    'scheduledDate': scheduledDate?.toIso8601String(),
-    'isNotificationEnabled': isNotificationEnabled,
-  };
+        'id': id,
+        'name': name,
+        'category': category.index,
+        'isForInternational': isForInternational,
+        'isCustom': isCustom,
+        'isActive': isActive,
+        'scheduledDate': scheduledDate?.toIso8601String(),
+        'isNotificationEnabled': isNotificationEnabled,
+      };
 
-  factory PreTripPreparation.fromJson(Map<String, dynamic> json) => PreTripPreparation(
-    id: json['id'] as String,
-    name: json['name'] as String,
-    category: PreTripPreparationCategory.values[json['category'] as int],
-    isForInternational: json['isForInternational'] as bool? ?? false,
-    isCustom: json['isCustom'] as bool? ?? false,
-    isActive: json['isActive'] as bool? ?? true,
-    scheduledDate: json['scheduledDate'] != null ? DateTime.parse(json['scheduledDate'] as String) : null,
-    isNotificationEnabled: json['isNotificationEnabled'] as bool? ?? false,
-  );
+  factory PreTripPreparation.fromJson(Map<String, dynamic> json) {
+    try {
+      // ✅ DateTime güvenli parse
+      DateTime? parsedDate;
+      final rawDate = json['scheduledDate'];
+      if (rawDate != null && rawDate is String && rawDate.isNotEmpty) {
+        try {
+          parsedDate = DateTime.parse(rawDate);
+        } catch (e) {
+          debugPrint('⚠️ scheduledDate parse hatası: $rawDate');
+          parsedDate = null;
+        }
+      }
+
+      return PreTripPreparation(
+        id: json['id']?.toString() ?? '',
+        name: json['name']?.toString() ?? '',
+        category: PreTripPreparationCategory.fromIndex(
+          json['category'] as int?,
+        ),
+        isForInternational: json['isForInternational'] as bool? ?? false,
+        isCustom: json['isCustom'] as bool? ?? false,
+        isActive: json['isActive'] as bool? ?? true,
+        scheduledDate: parsedDate,
+        isNotificationEnabled: json['isNotificationEnabled'] as bool? ?? false,
+      );
+    } catch (e) {
+      debugPrint('❌ PreTripPreparation.fromJson hatası: $e, json: $json');
+      rethrow;
+    }
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PreTripPreparation &&
+          runtimeType == other.runtimeType &&
+          id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
+
+  @override
+  String toString() =>
+      'PreTripPreparation(id: $id, name: $name, category: $category)';
 }

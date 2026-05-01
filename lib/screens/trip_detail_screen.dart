@@ -4,8 +4,6 @@ import 'package:provider/provider.dart';
 import '../models/enums.dart';
 import '../models/item_model.dart';
 import '../models/trip_model.dart';
-import '../models/home_check_model.dart';
-import '../models/pre_trip_preparation_model.dart';
 import '../providers/app_provider.dart';
 import '../widgets/item_tile.dart';
 import 'home_checks_screen.dart';
@@ -19,18 +17,35 @@ class TripDetailScreen extends StatefulWidget {
   State<TripDetailScreen> createState() => _TripDetailScreenState();
 }
 
-class _TripDetailScreenState extends State<TripDetailScreen> with SingleTickerProviderStateMixin {
+class _TripDetailScreenState extends State<TripDetailScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
+
+  static const _tabs = [
+    _TabInfo(
+      label: 'Hazırlık',
+      icon: Icons.assignment_turned_in,
+      color: Colors.purpleAccent,
+      fabLabel: 'Hazırlık Ekle',
+    ),
+    _TabInfo(
+      label: 'Eşyalar',
+      icon: Icons.luggage,
+      color: Colors.blueAccent,
+      fabLabel: 'Eşya Ekle',
+    ),
+    _TabInfo(
+      label: 'Ev Kontrol',
+      icon: Icons.home_work,
+      color: Colors.orangeAccent,
+      fabLabel: 'Kontrol Ekle',
+    ),
+  ];
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-    _tabController.addListener(() {
-      if (!_tabController.indexIsChanging) {
-        setState(() {});
-      }
-    });
+    _tabController = TabController(length: _tabs.length, vsync: this);
   }
 
   @override
@@ -41,14 +56,17 @@ class _TripDetailScreenState extends State<TripDetailScreen> with SingleTickerPr
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final activeIndex = _tabController.index;
-
     return Consumer<AppProvider>(
       builder: (context, provider, _) {
         final trip = provider.getTripById(widget.tripId);
+
         if (trip == null) {
-          return Scaffold(appBar: AppBar(title: const Text('Hata')), body: const Center(child: Text('Seyahat bulunamadi')));
+          return Scaffold(
+            appBar: AppBar(title: const Text('Hata')),
+            body: const Center(
+              child: Text('Seyahat bulunamadı'),
+            ),
+          );
         }
 
         return Scaffold(
@@ -66,52 +84,50 @@ class _TripDetailScreenState extends State<TripDetailScreen> with SingleTickerPr
                   icon: const Icon(Icons.arrow_back, color: Colors.white),
                   onPressed: () => Navigator.pop(context),
                 ),
-                title: innerBoxIsScrolled ? Text(trip.name, style: const TextStyle(color: Colors.white, fontSize: 18)) : null,
+                title: innerBoxIsScrolled
+                    ? Text(
+                        trip.name,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                        ),
+                      )
+                    : null,
                 centerTitle: true,
               ),
               SliverPersistentHeader(
                 pinned: true,
-                delegate: _SliverAppBarDelegate(
-                  TabBar(
-                    controller: _tabController,
-                    indicatorColor: theme.colorScheme.primary,
-                    labelColor: theme.colorScheme.primary,
-                    unselectedLabelColor: Colors.white54,
-                    indicatorWeight: 3,
-                    labelPadding: EdgeInsets.zero,
-                    tabs: [
-                      Tab(
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.assignment_turned_in, size: 16, color: _tabController.index == 0 ? Colors.purpleAccent : Colors.white54),
-                            const SizedBox(width: 4),
-                            const Text('Hazırlık', style: TextStyle(fontSize: 12)),
-                          ],
-                        ),
-                      ),
-                      Tab(
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.luggage, size: 16, color: _tabController.index == 1 ? Colors.blueAccent : Colors.white54),
-                            const SizedBox(width: 4),
-                            const Text('Eşyalar', style: TextStyle(fontSize: 12)),
-                          ],
-                        ),
-                      ),
-                      Tab(
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.home_work, size: 16, color: _tabController.index == 2 ? Colors.orangeAccent : Colors.white54),
-                            const SizedBox(width: 4),
-                            const Text('Ev Kontrol', style: TextStyle(fontSize: 12)),
-                          ],
-                        ),
-                      ),
-                    ],
-                    onTap: (index) => setState(() {}),
+                delegate: _SliverTabBarDelegate(
+                  tabBar: AnimatedBuilder(
+                    animation: _tabController,
+                    builder: (context, _) => TabBar(
+                      controller: _tabController,
+                      tabs: _tabs
+                          .asMap()
+                          .entries
+                          .map(
+                            (e) => Tab(
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    e.value.icon,
+                                    size: 16,
+                                    color: _tabController.index == e.key
+                                        ? e.value.color
+                                        : Colors.white54,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    e.value.label,
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                          .toList(),
+                    ),
                   ),
                 ),
               ),
@@ -119,194 +135,281 @@ class _TripDetailScreenState extends State<TripDetailScreen> with SingleTickerPr
             body: TabBarView(
               controller: _tabController,
               children: [
-                _PreTripPreparationsTab(trip: trip),
+                PreTripPreparationsScreen(tripId: widget.tripId),
                 _PackingListTab(trip: trip),
-                _HomeChecksTab(trip: trip),
+                HomeChecksScreen(tripId: widget.tripId),
               ],
             ),
           ),
-          floatingActionButton: FloatingActionButton.extended(
-            onPressed: () {
-              if (activeIndex == 0) {
-                _showAddPrepDialog(context, trip.id);
-              } else if (activeIndex == 1) {
-                _showAddItemDialog(context, trip.id);
-              } else {
-                _showAddCheckDialog(context, trip.id);
-              }
+          floatingActionButton: AnimatedBuilder(
+            animation: _tabController,
+            builder: (context, _) {
+              final tabInfo = _tabs[_tabController.index];
+              return FloatingActionButton.extended(
+                onPressed: () => _handleFabPress(context, trip.id),
+                icon: const Icon(Icons.add),
+                label: Text(tabInfo.fabLabel),
+                backgroundColor: tabInfo.color,
+                foregroundColor: Colors.white,
+              );
             },
-            icon: const Icon(Icons.add),
-            label: Text(activeIndex == 0 ? 'Hazırlık Ekle' : (activeIndex == 1 ? 'Eşya Ekle' : 'Kontrol Ekle')),
-            backgroundColor: activeIndex == 0 ? Colors.purpleAccent : (activeIndex == 1 ? Colors.blueAccent : Colors.orangeAccent),
-            foregroundColor: Colors.white,
           ),
         );
       },
     );
   }
 
-  void _showAddItemDialog(BuildContext context, String tripId) {
-    final controller = TextEditingController();
-    ItemCategory selectedCategory = ItemCategory.clothingBasic;
+  void _handleFabPress(BuildContext context, String tripId) {
+    HapticFeedback.mediumImpact();
+    switch (_tabController.index) {
+      case 0:
+        _showAddPrepDialog(context, tripId);
+      case 1:
+        _showAddItemDialog(context, tripId);
+      case 2:
+        _showAddCheckDialog(context, tripId);
+    }
+  }
 
+  void _showAddItemDialog(BuildContext context, String tripId) {
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          backgroundColor: const Color(0xFF1E1E1E),
-          title: const Text('Yeni Eşya Ekle', style: TextStyle(color: Colors.white)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: controller,
-                style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
-                  hintText: 'Eşya adı...',
-                  hintStyle: TextStyle(color: Colors.white38),
-                ),
-                autofocus: true,
-              ),
-              const SizedBox(height: 16),
-              DropdownButton<ItemCategory>(
-                value: selectedCategory,
-                isExpanded: true,
-                dropdownColor: const Color(0xFF1E1E1E),
-                items: ItemCategory.values.map((c) => DropdownMenuItem(
-                  value: c, 
-                  child: Text(c.label, style: const TextStyle(color: Colors.white))
-                )).toList(),
-                onChanged: (val) {
-                  if (val != null) setState(() => selectedCategory = val);
-                },
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('İptal')),
-            FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: Colors.blueAccent),
-              onPressed: () {
-                if (controller.text.isNotEmpty) {
-                  context.read<AppProvider>().addItemToTrip(tripId, controller.text.trim(), selectedCategory);
-                  Navigator.pop(ctx);
-                }
-              },
-              child: const Text('Ekle', style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        ),
-      ),
+      builder: (ctx) => _AddItemDialog(tripId: tripId),
     );
   }
 
   void _showAddCheckDialog(BuildContext context, String tripId) {
-    final controller = TextEditingController();
-    HomeCheckCategory selectedCategory = HomeCheckCategory.other;
-
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          backgroundColor: const Color(0xFF1E1E1E),
-          title: const Text('Yeni Kontrol Ekle', style: TextStyle(color: Colors.white)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: controller,
-                style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
-                  hintText: 'Kontrol adı...',
-                  hintStyle: TextStyle(color: Colors.white38),
-                ),
-                autofocus: true,
-              ),
-              const SizedBox(height: 16),
-              DropdownButton<HomeCheckCategory>(
-                value: selectedCategory,
-                isExpanded: true,
-                dropdownColor: const Color(0xFF1E1E1E),
-                items: HomeCheckCategory.values.map((c) => DropdownMenuItem(
-                  value: c, 
-                  child: Text(c.label, style: const TextStyle(color: Colors.white))
-                )).toList(),
-                onChanged: (val) {
-                  if (val != null) setState(() => selectedCategory = val);
-                },
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('İptal')),
-            FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: Colors.orangeAccent),
-              onPressed: () {
-                if (controller.text.isNotEmpty) {
-                  context.read<AppProvider>().addCustomCheckToTrip(tripId, controller.text.trim(), selectedCategory);
-                  Navigator.pop(ctx);
-                }
-              },
-              child: const Text('Ekle', style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        ),
-      ),
+      builder: (ctx) => _AddCheckDialog(tripId: tripId),
     );
   }
 
   void _showAddPrepDialog(BuildContext context, String tripId) {
-    final controller = TextEditingController();
-    PreTripPreparationCategory selectedCategory = PreTripPreparationCategory.travelPrep;
-
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          backgroundColor: const Color(0xFF1E1E1E),
-          title: const Text('Yeni Hazırlık Ekle', style: TextStyle(color: Colors.white)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: controller,
-                style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
-                  hintText: 'Hazırlık adı...',
-                  hintStyle: TextStyle(color: Colors.white38),
-                ),
-                autofocus: true,
-              ),
-              const SizedBox(height: 16),
-              DropdownButton<PreTripPreparationCategory>(
-                value: selectedCategory,
-                isExpanded: true,
-                dropdownColor: const Color(0xFF1E1E1E),
-                items: PreTripPreparationCategory.values.map((c) => DropdownMenuItem(
-                  value: c, 
-                  child: Text(c.label, style: const TextStyle(color: Colors.white))
-                )).toList(),
-                onChanged: (val) {
-                  if (val != null) setState(() => selectedCategory = val);
-                },
-              ),
-            ],
+      builder: (ctx) => _AddPrepDialog(tripId: tripId),
+    );
+  }
+}
+
+class _TabInfo {
+  final String label;
+  final IconData icon;
+  final Color color;
+  final String fabLabel;
+
+  const _TabInfo({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.fabLabel,
+  });
+}
+
+class _AddItemDialog extends StatefulWidget {
+  final String tripId;
+  const _AddItemDialog({required this.tripId});
+
+  @override
+  State<_AddItemDialog> createState() => _AddItemDialogState();
+}
+
+class _AddItemDialogState extends State<_AddItemDialog> {
+  final _controller = TextEditingController();
+  ItemCategory _category = ItemCategory.clothingBasic;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Yeni Eşya Ekle'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _controller,
+            decoration: const InputDecoration(hintText: 'Eşya adı...'),
+            autofocus: true,
+            maxLength: 50,
+            textCapitalization: TextCapitalization.words,
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('İptal')),
-            FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: Colors.purpleAccent),
-              onPressed: () {
-                if (controller.text.isNotEmpty) {
-                  context.read<AppProvider>().addCustomPreTripPreparationToTrip(tripId, controller.text.trim(), selectedCategory);
-                  Navigator.pop(ctx);
-                }
-              },
-              child: const Text('Ekle', style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        ),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<ItemCategory>(
+            initialValue: _category,
+            decoration: const InputDecoration(labelText: 'Kategori'),
+            items: ItemCategory.values
+                .map((c) => DropdownMenuItem(value: c, child: Text(c.label)))
+                .toList(),
+            onChanged: (val) {
+              if (val != null) setState(() => _category = val);
+            },
+          ),
+        ],
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('İptal'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: Colors.blueAccent),
+          onPressed: () {
+            final name = _controller.text.trim();
+            if (name.isEmpty) return;
+            context.read<AppProvider>().addItemToTrip(
+                  widget.tripId,
+                  name,
+                  _category,
+                );
+            Navigator.pop(context);
+          },
+          child: const Text('Ekle'),
+        ),
+      ],
+    );
+  }
+}
+
+class _AddCheckDialog extends StatefulWidget {
+  final String tripId;
+  const _AddCheckDialog({required this.tripId});
+
+  @override
+  State<_AddCheckDialog> createState() => _AddCheckDialogState();
+}
+
+class _AddCheckDialogState extends State<_AddCheckDialog> {
+  final _controller = TextEditingController();
+  HomeCheckCategory _category = HomeCheckCategory.other;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Yeni Kontrol Ekle'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _controller,
+            decoration: const InputDecoration(hintText: 'Kontrol adı...'),
+            autofocus: true,
+            maxLength: 50,
+            textCapitalization: TextCapitalization.sentences,
+          ),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<HomeCheckCategory>(
+            initialValue: _category,
+            decoration: const InputDecoration(labelText: 'Kategori'),
+            items: HomeCheckCategory.values
+                .map((c) => DropdownMenuItem(value: c, child: Text(c.label)))
+                .toList(),
+            onChanged: (val) {
+              if (val != null) setState(() => _category = val);
+            },
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('İptal'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: Colors.orangeAccent),
+          onPressed: () {
+            final name = _controller.text.trim();
+            if (name.isEmpty) return;
+            context.read<AppProvider>().addCustomCheckToTrip(
+                  widget.tripId,
+                  name,
+                  _category,
+                );
+            Navigator.pop(context);
+          },
+          child: const Text('Ekle'),
+        ),
+      ],
+    );
+  }
+}
+
+class _AddPrepDialog extends StatefulWidget {
+  final String tripId;
+  const _AddPrepDialog({required this.tripId});
+
+  @override
+  State<_AddPrepDialog> createState() => _AddPrepDialogState();
+}
+
+class _AddPrepDialogState extends State<_AddPrepDialog> {
+  final _controller = TextEditingController();
+  PreTripPreparationCategory _category = PreTripPreparationCategory.travelPrep;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Yeni Hazırlık Ekle'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _controller,
+            decoration: const InputDecoration(hintText: 'Hazırlık adı...'),
+            autofocus: true,
+            maxLength: 50,
+            textCapitalization: TextCapitalization.sentences,
+          ),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<PreTripPreparationCategory>(
+            initialValue: _category,
+            decoration: const InputDecoration(labelText: 'Kategori'),
+            items: PreTripPreparationCategory.values
+                .map((c) => DropdownMenuItem(value: c, child: Text(c.label)))
+                .toList(),
+            onChanged: (val) {
+              if (val != null) setState(() => _category = val);
+            },
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('İptal'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: Colors.purpleAccent),
+          onPressed: () {
+            final name = _controller.text.trim();
+            if (name.isEmpty) return;
+            context.read<AppProvider>().addCustomPreTripPreparationToTrip(
+                  widget.tripId,
+                  name,
+                  _category,
+                );
+            Navigator.pop(context);
+          },
+          child: const Text('Ekle'),
+        ),
+      ],
     );
   }
 }
@@ -318,15 +421,17 @@ class _TripHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+    final primaryColor = theme.colorScheme.primary;
+
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            Color(0xFF0D47A1), // Koyu Mavi
-            Color(0xFF121212),
+            // ✅ FIX 1: withOpacity → withValues(alpha:) (satır 440)
+            primaryColor.withValues(alpha: 0.6),
+            const Color(0xFF121212),
           ],
         ),
       ),
@@ -336,46 +441,69 @@ class _TripHeader extends StatelessWidget {
         children: [
           Text(
             trip.name,
-            style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
             textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 20),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  const Icon(Icons.swap_calls, color: Colors.white70, size: 20),
-                  const SizedBox(width: 8),
-                  Text('${trip.fromLocation} → ${trip.toLocation}', style: const TextStyle(color: Colors.white, fontSize: 16)),
-                ],
-              ),
-              Stack(
-                alignment: Alignment.center,
-                children: [
-                  SizedBox(
-                    width: 54,
-                    height: 54,
-                    child: CircularProgressIndicator(
-                      value: trip.progress,
-                      strokeWidth: 5,
-                      backgroundColor: Colors.white10,
-                      valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
+              Expanded(
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.swap_calls,
+                      color: Colors.white70,
+                      size: 20,
                     ),
-                  ),
-                  Text('%${(trip.progress * 100).toInt()}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                ],
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '${trip.fromLocation} → ${trip.toLocation}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              _CircularProgress(
+                progress: trip.progress,
+                color: primaryColor,
               ),
             ],
           ),
           const SizedBox(height: 12),
-          Row(
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
             children: [
-              _InfoChip(icon: Icons.calendar_today, label: '${trip.days} gün', color: theme.colorScheme.primary),
-              const SizedBox(width: 8),
-              _InfoChip(icon: trip.season.iconData, label: trip.season.label, color: trip.season.color),
-              const SizedBox(width: 8),
-              _InfoChip(icon: trip.gender.iconData, label: trip.gender.label, color: trip.gender.color),
+              _InfoChip(
+                icon: Icons.calendar_today,
+                label: '${trip.days} gün',
+                color: primaryColor,
+              ),
+              _InfoChip(
+                icon: trip.season.iconData,
+                label: trip.season.label,
+                color: trip.season.color,
+              ),
+              _InfoChip(
+                icon: trip.gender.iconData,
+                label: trip.gender.label,
+                color: trip.gender.color,
+              ),
             ],
           ),
           const Spacer(),
@@ -384,14 +512,18 @@ class _TripHeader extends StatelessWidget {
               LinearProgressIndicator(
                 value: trip.progress,
                 backgroundColor: Colors.white10,
-                color: theme.colorScheme.primary,
+                color: primaryColor,
                 borderRadius: BorderRadius.circular(10),
                 minHeight: 8,
               ),
               const SizedBox(height: 12),
               Text(
                 '${trip.packedCount} / ${trip.totalCount} eşya hazırlandı',
-                style: const TextStyle(color: Colors.white60, fontSize: 14, fontWeight: FontWeight.w500),
+                style: const TextStyle(
+                  color: Colors.white60,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ],
           ),
@@ -401,19 +533,60 @@ class _TripHeader extends StatelessWidget {
   }
 }
 
+class _CircularProgress extends StatelessWidget {
+  final double progress;
+  final Color color;
+
+  const _CircularProgress({required this.progress, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        SizedBox(
+          width: 54,
+          height: 54,
+          child: CircularProgressIndicator(
+            value: progress,
+            strokeWidth: 5,
+            backgroundColor: Colors.white10,
+            valueColor: AlwaysStoppedAnimation<Color>(color),
+          ),
+        ),
+        Text(
+          '%${(progress * 100).toInt()}',
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _InfoChip extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
-  const _InfoChip({required this.icon, required this.label, required this.color});
+
+  const _InfoChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
+        // ✅ FIX 2: withOpacity → withValues(alpha:) (satır 594)
         color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
+        // ✅ FIX 3: withOpacity → withValues(alpha:) (satır 596)
         border: Border.all(color: color.withValues(alpha: 0.3), width: 0.5),
       ),
       child: Row(
@@ -421,7 +594,14 @@ class _InfoChip extends StatelessWidget {
         children: [
           Icon(icon, size: 14, color: color),
           const SizedBox(width: 6),
-          Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold)),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ],
       ),
     );
@@ -434,19 +614,29 @@ class _PackingListTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (trip.items.isEmpty) {
+      return const Center(
+        child: Text(
+          'Eşya yok',
+          style: TextStyle(color: Colors.white54),
+        ),
+      );
+    }
+
     final Map<ItemCategory, List<TripItem>> grouped = {};
     for (final item in trip.items) {
       grouped.putIfAbsent(item.category, () => []).add(item);
     }
-    final categories = grouped.keys.toList()..sort((a, b) => a.index.compareTo(b.index));
+    final categories = grouped.keys.toList()
+      ..sort((a, b) => a.index.compareTo(b.index));
 
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 80), 
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
       itemCount: categories.length,
       itemBuilder: (context, index) {
         final category = categories[index];
         final items = grouped[category]!;
-        final packedInCategory = items.where((i) => i.isPacked).length;
+        final packedCount = items.where((i) => i.isPacked).length;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -455,22 +645,33 @@ class _PackingListTab extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
               child: Row(
                 children: [
-                  Icon(Icons.star, color: category.color, size: 20),
+                  Icon(category.iconData, color: category.color, size: 20),
                   const SizedBox(width: 8),
                   Text(
-                    category.label, 
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)
+                    category.label,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: Colors.white10, 
-                      borderRadius: BorderRadius.circular(12)
+                      color: Colors.white10,
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      '$packedInCategory/${items.length}', 
-                      style: const TextStyle(fontSize: 12, color: Colors.white60, fontWeight: FontWeight.bold)
+                      '$packedCount/${items.length}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.white60,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ],
@@ -485,43 +686,29 @@ class _PackingListTab extends StatelessWidget {
   }
 }
 
-class _HomeChecksTab extends StatelessWidget {
-  final Trip trip;
-  const _HomeChecksTab({required this.trip});
+class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {
+  final Widget tabBar;
+  const _SliverTabBarDelegate({required this.tabBar});
 
   @override
-  Widget build(BuildContext context) {
-    return HomeChecksScreen(tripId: trip.id);
-  }
-}
-
-class _PreTripPreparationsTab extends StatelessWidget {
-  final Trip trip;
-  const _PreTripPreparationsTab({required this.trip});
+  double get minExtent => kTextTabBarHeight;
 
   @override
-  Widget build(BuildContext context) {
-    return PreTripPreparationsScreen(tripId: trip.id);
-  }
-}
-
-class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
-  final TabBar _tabBar;
-  _SliverAppBarDelegate(this._tabBar);
+  double get maxExtent => kTextTabBarHeight;
 
   @override
-  double get minExtent => _tabBar.preferredSize.height;
-  @override
-  double get maxExtent => _tabBar.preferredSize.height;
-
-  @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return Container(
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return ColoredBox(
       color: const Color(0xFF121212),
-      child: _tabBar,
+      child: tabBar,
     );
   }
 
   @override
-  bool shouldRebuild(_SliverAppBarDelegate oldDelegate) => false;
+  bool shouldRebuild(_SliverTabBarDelegate oldDelegate) =>
+      tabBar != oldDelegate.tabBar;
 }

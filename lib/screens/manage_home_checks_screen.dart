@@ -11,43 +11,65 @@ class ManageHomeChecksScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Ev Kontrollerini Yönet'), centerTitle: true),
+      appBar: AppBar(
+        title: const Text('Ev Kontrollerini Yönet'),
+        centerTitle: true,
+      ),
       body: Consumer<AppProvider>(
         builder: (context, provider, _) {
           final Map<HomeCheckCategory, List<HomeCheck>> grouped = {};
           for (final check in provider.allHomeChecks) {
             grouped.putIfAbsent(check.category, () => []).add(check);
           }
-          final categories = grouped.keys.toList()..sort((a, b) => a.index.compareTo(b.index));
+          final categories = grouped.keys.toList()
+            ..sort((a, b) => a.index.compareTo(b.index));
+
+          if (categories.isEmpty) {
+            return const Center(
+              child: Text(
+                'Kontrol bulunamadı',
+                style: TextStyle(color: Colors.white54),
+              ),
+            );
+          }
 
           return ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 80), // Buton icin alt bosluk eklendi
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
             itemCount: categories.length,
             itemBuilder: (context, index) {
               final category = categories[index];
-              return _CategoryCard(category: category, checks: grouped[category]!);
+              return _CheckCategoryCard(
+                category: category,
+                checks: grouped[category]!,
+              );
             },
           );
         },
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showAddCheckDialog(context),
+        onPressed: () {
+          HapticFeedback.mediumImpact();
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            builder: (_) => const _AddCheckSheet(),
+          );
+        },
         icon: const Icon(Icons.add),
         label: const Text('Kontrol Ekle'),
       ),
     );
   }
-
-  void _showAddCheckDialog(BuildContext context) {
-    HapticFeedback.mediumImpact();
-    showModalBottomSheet(context: context, isScrollControlled: true, builder: (_) => const _AddCheckSheet());
-  }
 }
 
-class _CategoryCard extends StatelessWidget {
+class _CheckCategoryCard extends StatelessWidget {
   final HomeCheckCategory category;
   final List<HomeCheck> checks;
-  const _CategoryCard({required this.category, required this.checks});
+
+  const _CheckCategoryCard({
+    required this.category,
+    required this.checks,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -57,31 +79,83 @@ class _CategoryCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: ExpansionTile(
-        leading: Icon(category.iconData, color: theme.colorScheme.secondary),
-        title: Text(category.label, style: const TextStyle(fontWeight: FontWeight.bold)),
+        leading: Icon(
+          category.iconData,
+          color: theme.colorScheme.secondary,
+        ),
+        title: Text(
+          category.label,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
         subtitle: Text('$activeCount/${checks.length} aktif'),
-        children: checks.map((check) {
-          return ListTile(
-            dense: true,
-            leading: Switch(
-              value: check.isActive,
-              onChanged: (_) {
-                HapticFeedback.selectionClick();
-                context.read<AppProvider>().toggleCheckActive(check.id);
-              },
-            ),
-            title: Text(check.name, style: TextStyle(color: check.isActive ? null : theme.colorScheme.onSurface.withValues(alpha: 0.5))),
-            trailing: check.isCustom
-                ? IconButton(
-                    icon: const Icon(Icons.delete_outline, color: Colors.red),
-                    onPressed: () {
-                      HapticFeedback.mediumImpact();
-                      context.read<AppProvider>().deleteCustomCheck(check.id);
-                    },
-                  )
-                : null,
-          );
-        }).toList(),
+        shape: const RoundedRectangleBorder(side: BorderSide.none),
+        children: checks.map((check) => _CheckListTile(check: check)).toList(),
+      ),
+    );
+  }
+}
+
+class _CheckListTile extends StatelessWidget {
+  final HomeCheck check;
+
+  const _CheckListTile({required this.check});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return ListTile(
+      dense: true,
+      leading: Switch(
+        value: check.isActive,
+        onChanged: (_) {
+          HapticFeedback.selectionClick();
+          context.read<AppProvider>().toggleCheckActive(check.id);
+        },
+      ),
+      title: Text(
+        check.name,
+        style: TextStyle(
+          color: check.isActive
+              ? null
+              // ✅ FIX 1: withOpacity → withValues(alpha:) (satır 121)
+              : theme.colorScheme.onSurface.withValues(alpha: 0.4),
+        ),
+      ),
+      trailing: check.isCustom
+          ? IconButton(
+              icon: const Icon(
+                Icons.delete_outline,
+                color: Colors.redAccent,
+              ),
+              tooltip: 'Sil',
+              onPressed: () => _confirmDelete(context),
+            )
+          : null,
+    );
+  }
+
+  void _confirmDelete(BuildContext context) {
+    HapticFeedback.mediumImpact();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Kontrolü Sil'),
+        content: Text('"${check.name}" kontrolünü silmek istiyor musunuz?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('İptal'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.read<AppProvider>().deleteCustomCheck(check.id);
+            },
+            child: const Text('Sil'),
+          ),
+        ],
       ),
     );
   }
@@ -96,7 +170,9 @@ class _AddCheckSheet extends StatefulWidget {
 
 class _AddCheckSheetState extends State<_AddCheckSheet> {
   final _nameController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
   HomeCheckCategory _category = HomeCheckCategory.other;
+  bool _isSaving = false;
 
   @override
   void dispose() {
@@ -109,42 +185,122 @@ class _AddCheckSheetState extends State<_AddCheckSheet> {
     final theme = Theme.of(context);
 
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: theme.colorScheme.onSurface.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(2)))),
-            const SizedBox(height: 24),
-            Text('Yeni Kontrol Ekle', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 24),
-            TextField(controller: _nameController, decoration: const InputDecoration(labelText: 'Kontrol Adi', hintText: 'Ornegin: Balkon kapisini kapat', prefixIcon: Icon(Icons.edit)), textCapitalization: TextCapitalization.sentences),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<HomeCheckCategory>(
-              value: _category,
-              decoration: const InputDecoration(labelText: 'Kategori', prefixIcon: Icon(Icons.category)),
-              items: HomeCheckCategory.values.map((c) => DropdownMenuItem(value: c, child: Text(c.label))).toList(),
-              onChanged: (val) => setState(() => _category = val!),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(width: double.infinity, child: FilledButton.icon(onPressed: _addCheck, icon: const Icon(Icons.add), label: const Text('Ekle'))),
-            const SizedBox(height: 16),
-          ],
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    // ✅ FIX 2: withOpacity → withValues(alpha:) (satır 205)
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Yeni Kontrol Ekle',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 24),
+              TextFormField(
+                controller: _nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Kontrol Adı',
+                  hintText: 'Örneğin: Balkon kapısını kapat',
+                  prefixIcon: Icon(Icons.edit),
+                ),
+                textCapitalization: TextCapitalization.sentences,
+                maxLength: 50,
+                validator: (val) {
+                  if (val == null || val.trim().isEmpty) {
+                    return 'Kontrol adı boş olamaz';
+                  }
+                  if (val.trim().length < 2) {
+                    return 'En az 2 karakter girin';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<HomeCheckCategory>(
+                initialValue: _category,
+                decoration: const InputDecoration(
+                  labelText: 'Kategori',
+                  prefixIcon: Icon(Icons.category),
+                ),
+                items: HomeCheckCategory.values
+                    .map((c) => DropdownMenuItem(
+                          value: c,
+                          child: Text(c.label),
+                        ))
+                    .toList(),
+                onChanged: (val) {
+                  if (val != null) setState(() => _category = val);
+                },
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: _isSaving ? null : _addCheck,
+                  icon: _isSaving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.add),
+                  label: Text(_isSaving ? 'Ekleniyor...' : 'Ekle'),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  void _addCheck() {
-    final name = _nameController.text.trim();
-    if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Lutfen kontrol adi girin')));
-      return;
+  Future<void> _addCheck() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (_isSaving) return;
+
+    setState(() => _isSaving = true);
+
+    try {
+      HapticFeedback.heavyImpact();
+      await context.read<AppProvider>().addCustomCheck(
+            HomeCheck(
+              id: '',
+              name: _nameController.text.trim(),
+              category: _category,
+            ),
+          );
+      if (!mounted) return;
+      Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Kontrol eklenemedi: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
-    HapticFeedback.heavyImpact();
-    context.read<AppProvider>().addCustomCheck(HomeCheck(id: '', name: name, category: _category));
-    Navigator.pop(context);
   }
 }

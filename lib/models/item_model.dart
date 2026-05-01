@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'enums.dart';
 
 class PackingItem {
@@ -33,43 +34,78 @@ class PackingItem {
     bool? internationalOnly,
     bool? isCustom,
     bool? isActive,
-  }) {
-    return PackingItem(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      category: category ?? this.category,
-      genderVisibility: genderVisibility ?? this.genderVisibility,
-      seasons: seasons ?? this.seasons,
-      transports: transports ?? this.transports,
-      internationalOnly: internationalOnly ?? this.internationalOnly,
-      isCustom: isCustom ?? this.isCustom,
-      isActive: isActive ?? this.isActive,
-    );
-  }
+  }) =>
+      PackingItem(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        category: category ?? this.category,
+        genderVisibility: genderVisibility ?? this.genderVisibility,
+        seasons: seasons ?? this.seasons,
+        transports: transports ?? this.transports,
+        internationalOnly: internationalOnly ?? this.internationalOnly,
+        isCustom: isCustom ?? this.isCustom,
+        isActive: isActive ?? this.isActive,
+      );
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
-    'category': category.index,
-    'genderVisibility': genderVisibility.index,
-    'seasons': seasons.map((s) => s.index).toList(),
-    'transports': transports.map((t) => t.index).toList(),
-    'internationalOnly': internationalOnly,
-    'isCustom': isCustom,
-    'isActive': isActive,
-  };
+        'id': id,
+        'name': name,
+        'category': category.index,
+        'genderVisibility': genderVisibility.index,
+        'seasons': seasons.map((s) => s.index).toList(),
+        'transports': transports.map((t) => t.index).toList(),
+        'internationalOnly': internationalOnly,
+        'isCustom': isCustom,
+        'isActive': isActive,
+      };
 
-  factory PackingItem.fromJson(Map<String, dynamic> json) => PackingItem(
-    id: json['id'] as String,
-    name: json['name'] as String,
-    category: ItemCategory.values[json['category'] as int],
-    genderVisibility: GenderVisibility.values[json['genderVisibility'] as int],
-    seasons: (json['seasons'] as List?)?.map((s) => Season.values[s as int]).toList() ?? [],
-    transports: (json['transports'] as List?)?.map((t) => Transport.values[t as int]).toList() ?? [],
-    internationalOnly: json['internationalOnly'] as bool? ?? false,
-    isCustom: json['isCustom'] as bool? ?? false,
-    isActive: json['isActive'] as bool? ?? true,
-  );
+  factory PackingItem.fromJson(Map<String, dynamic> json) {
+    try {
+      return PackingItem(
+        id: json['id']?.toString() ?? '',
+        name: json['name']?.toString() ?? '',
+        category: ItemCategory.fromIndex(json['category'] as int?),
+        genderVisibility: GenderVisibility.fromIndex(
+          json['genderVisibility'] as int?,
+        ),
+        // ✅ Güvenli list parse - her eleman ayrı kontrol
+        seasons: _parseEnumList(
+          json['seasons'],
+          Season.fromIndex,
+        ),
+        transports: _parseEnumList(
+          json['transports'],
+          Transport.fromIndex,
+        ),
+        internationalOnly: json['internationalOnly'] as bool? ?? false,
+        isCustom: json['isCustom'] as bool? ?? false,
+        isActive: json['isActive'] as bool? ?? true,
+      );
+    } catch (e) {
+      debugPrint('❌ PackingItem.fromJson hatası: $e, json: $json');
+      rethrow;
+    }
+  }
+
+  /// ✅ Güvenli enum list parse yardımcısı
+  static List<T> _parseEnumList<T>(
+    dynamic rawList,
+    T Function(int?) fromIndex,
+  ) {
+    if (rawList == null) return [];
+    if (rawList is! List) return [];
+
+    return rawList
+        .map((e) {
+          try {
+            return fromIndex(e as int?);
+          } catch (_) {
+            return null;
+          }
+        })
+        .whereType<T>()
+        .toList();
+  }
 
   bool isVisibleFor({
     required Gender gender,
@@ -84,8 +120,22 @@ class PackingItem {
     if (internationalOnly && tripType == TripType.domestic) return false;
     return true;
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PackingItem &&
+          runtimeType == other.runtimeType &&
+          id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
+
+  @override
+  String toString() => 'PackingItem(id: $id, name: $name, category: $category)';
 }
 
+// ─── TripItem ─────────────────────────────────────────────────────────────────
 class TripItem {
   final String itemId;
   final String name;
@@ -99,24 +149,51 @@ class TripItem {
     required this.category,
   });
 
-  TripItem copyWith({String? itemId, String? name, bool? isPacked, ItemCategory? category}) => TripItem(
-    itemId: itemId ?? this.itemId,
-    name: name ?? this.name,
-    isPacked: isPacked ?? this.isPacked,
-    category: category ?? this.category,
-  );
+  TripItem copyWith({
+    String? itemId,
+    String? name,
+    bool? isPacked,
+    ItemCategory? category,
+  }) =>
+      TripItem(
+        itemId: itemId ?? this.itemId,
+        name: name ?? this.name,
+        isPacked: isPacked ?? this.isPacked,
+        category: category ?? this.category,
+      );
 
   Map<String, dynamic> toJson() => {
-    'itemId': itemId,
-    'name': name,
-    'isPacked': isPacked,
-    'category': category.index,
-  };
+        'itemId': itemId,
+        'name': name,
+        'isPacked': isPacked,
+        'category': category.index,
+      };
 
-  factory TripItem.fromJson(Map<String, dynamic> json) => TripItem(
-    itemId: json['itemId'] as String,
-    name: json['name'] as String,
-    isPacked: json['isPacked'] as bool? ?? false,
-    category: ItemCategory.values[json['category'] as int],
-  );
+  factory TripItem.fromJson(Map<String, dynamic> json) {
+    try {
+      return TripItem(
+        itemId: json['itemId']?.toString() ?? '',
+        name: json['name']?.toString() ?? '',
+        isPacked: json['isPacked'] as bool? ?? false,
+        category: ItemCategory.fromIndex(json['category'] as int?),
+      );
+    } catch (e) {
+      debugPrint('❌ TripItem.fromJson hatası: $e');
+      rethrow;
+    }
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is TripItem &&
+          runtimeType == other.runtimeType &&
+          itemId == other.itemId;
+
+  @override
+  int get hashCode => itemId.hashCode;
+
+  @override
+  String toString() =>
+      'TripItem(itemId: $itemId, name: $name, isPacked: $isPacked)';
 }
