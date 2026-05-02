@@ -25,7 +25,7 @@ class AppProvider extends ChangeNotifier {
   Map<String, bool> _preparationActiveStatus = {};
 
   bool _isLoading = true;
-  String? _error; // ✅ Hata durumu eklendi
+  String? _error;
   AppThemeMode _currentTheme = AppThemeMode.classicDark;
 
   // ─── Getters ──────────────────────────────────────────────────────────────
@@ -35,21 +35,16 @@ class AppProvider extends ChangeNotifier {
       List.unmodifiable(_allPreTripPreparations);
   List<Trip> get trips => List.unmodifiable(_trips);
   bool get isLoading => _isLoading;
-  String? get error => _error; // ✅ UI hata gösterebilir
+  String? get error => _error;
   AppThemeMode get currentTheme => _currentTheme;
   bool get hasError => _error != null;
 
   // ─── Services ─────────────────────────────────────────────────────────────
   final _uuid = const Uuid();
-
-  // ✅ Singleton - NotificationService() zaten singleton döndürür
   final _notificationService = NotificationService();
-
-  // ✅ SharedPreferences cache - her işlemde yeniden açılmıyor
   SharedPreferences? _prefs;
 
-  // ─── SharedPreferences Key Sabitleri ─────────────────────────────────────
-  // ✅ Magic string'ler kaldırıldı
+  // ─── SharedPreferences Key Sabitleri ──────────────────────────────────────
   static const String _keyThemeIndex = 'app_theme_index';
   static const String _keyItemStatus = 'item_status';
   static const String _keyCheckStatus = 'check_status';
@@ -59,6 +54,9 @@ class AppProvider extends ChangeNotifier {
   static const String _keyCustomPreparations = 'custom_preparations';
   static const String _keyTrips = 'trips';
 
+  // ✅ YENİ: İlk kurulum key'i
+  static const String _keyIsFirstLaunch = 'is_first_launch';
+
   // ─── Init ─────────────────────────────────────────────────────────────────
   Future<void> init() async {
     _isLoading = true;
@@ -66,18 +64,25 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // ✅ SharedPreferences bir kere açılıyor, cache'leniyor
       _prefs = await SharedPreferences.getInstance();
+
+      // ✅ YENİ: İlk kurulum kontrolü
+      final isFirstLaunch = _prefs!.getBool(_keyIsFirstLaunch) ?? true;
+
+      if (isFirstLaunch) {
+        // İlk açılış: flag'i false yap, gezileri temizle
+        await _prefs!.setBool(_keyIsFirstLaunch, false);
+        await _prefs!.remove(_keyTrips); // Varsa eski veriyi sil
+        debugPrint('✅ İlk kurulum: temiz ekran gösteriliyor');
+      }
+
       await _loadAllData();
     } catch (e, stack) {
-      // ✅ Hata yakala - uygulama asılı kalmaz
       _error = 'Veriler yüklenirken hata oluştu';
       debugPrint('❌ AppProvider init hatası: $e');
       debugPrint('Stack: $stack');
-      // Default değerlerle devam et
       _loadDefaults();
     } finally {
-      // ✅ finally bloğu - hata olsa da isLoading kapanır
       _isLoading = false;
       notifyListeners();
     }
@@ -98,7 +103,6 @@ class AppProvider extends ChangeNotifier {
 
     // ── Tema ──────────────────────────────────────────────────────────────
     final themeIndex = prefs.getInt(_keyThemeIndex) ?? 0;
-    // ✅ Bounds check - bozuk veri olsa da crash olmaz
     _currentTheme = (themeIndex >= 0 && themeIndex < AppThemeMode.values.length)
         ? AppThemeMode.values[themeIndex]
         : AppThemeMode.classicDark;
@@ -157,6 +161,7 @@ class AppProvider extends ChangeNotifier {
     ];
 
     // ── Trips ─────────────────────────────────────────────────────────────
+    // ✅ İlk kurulumda _keyTrips zaten silindi, boş liste gelir
     _trips = _loadList<Trip>(prefs, _keyTrips, Trip.fromJson);
   }
 
@@ -208,8 +213,6 @@ class AppProvider extends ChangeNotifier {
   }
 
   // ─── Save Yardımcıları ────────────────────────────────────────────────────
-  // ✅ _prefs cache kullanıyor, her seferinde getInstance() YOK
-
   Future<void> _saveTrips() async {
     await _saveJson(
       _keyTrips,
@@ -254,22 +257,19 @@ class AppProvider extends ChangeNotifier {
     );
   }
 
-  /// ✅ Merkezi kaydetme metodu - try-catch ile güvenli
   Future<void> _saveJson(String key, dynamic data) async {
     try {
-      // _prefs null ise (init çağrılmadan save) getInstance'ı çağır
       _prefs ??= await SharedPreferences.getInstance();
       await _prefs!.setString(key, jsonEncode(data));
     } catch (e) {
       debugPrint('❌ Kaydetme hatası ($key): $e');
-      // Kaydetme hatası kritik değil, kullanıcıya bildir ama çöktürme
     }
   }
 
   // ─── Tema ─────────────────────────────────────────────────────────────────
   Future<void> setTheme(AppThemeMode mode) async {
     _currentTheme = mode;
-    notifyListeners(); // ✅ Önce UI güncelle, sonra kaydet
+    notifyListeners();
     await _saveJson(_keyThemeIndex, mode.index);
   }
 
@@ -284,7 +284,6 @@ class AppProvider extends ChangeNotifier {
 
     notifyListeners();
 
-    // ✅ Paralel kaydetme
     await Future.wait([
       _saveItemStatus(),
       if (item.isCustom) _saveCustomItems(),
@@ -325,7 +324,6 @@ class AppProvider extends ChangeNotifier {
   }
 
   // ─── Trip Oluşturma ───────────────────────────────────────────────────────
-  // ✅ async yapıldı - _saveTrips() await edilebilir
   Future<Trip> createTrip({
     required String name,
     required String fromLocation,
@@ -382,9 +380,9 @@ class AppProvider extends ChangeNotifier {
     );
 
     _trips.insert(0, trip);
-    notifyListeners(); // ✅ Önce UI güncelle
+    notifyListeners();
 
-    await _saveTrips(); // ✅ Sonra kaydet
+    await _saveTrips();
     return trip;
   }
 
@@ -481,7 +479,6 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
     await _saveTrips();
 
-    // ✅ firstWhereOrNull kullan - crash yok
     final prep = trip.preTripPreparations.firstWhereOrNull(
       (p) => p.id == prepId,
     );
@@ -497,7 +494,7 @@ class AppProvider extends ChangeNotifier {
         title: 'Hazırlık Hatırlatıcısı',
         body: '${prep.name} zamanı geldi!',
         scheduledDate: prep.scheduledDate!,
-        payload: tripId, // ✅ payload - ileride navigation için
+        payload: tripId,
       );
     }
   }
@@ -520,7 +517,6 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
     await _saveTrips();
 
-    // ✅ Bildirimi güncelle
     final notifId = (tripId + updatedPrep.id).hashCode;
     final isCompleted =
         trip.completedPreTripPreparations.contains(updatedPrep.id);
@@ -740,7 +736,6 @@ class AppProvider extends ChangeNotifier {
   Future<void> deleteTrip(String id) async {
     final trip = getTripById(id);
     if (trip != null) {
-      // ✅ Tüm bildirimleri paralel iptal et
       await Future.wait(
         trip.preTripPreparations.map(
           (prep) => _notificationService.cancelNotification(
@@ -809,12 +804,11 @@ class AppProvider extends ChangeNotifier {
 
   // ─── Yardımcı ─────────────────────────────────────────────────────────────
   Trip? getTripById(String id) {
-    // ✅ firstWhereOrNull - try-catch yerine temiz kod
     return _trips.firstWhereOrNull((t) => t.id == id);
   }
 }
 
-// ✅ Extension - firstWhereOrNull (Dart'ta built-in yok, collection paketi olmadan)
+// ✅ Extension - firstWhereOrNull
 extension IterableExtension<T> on Iterable<T> {
   T? firstWhereOrNull(bool Function(T) test) {
     for (final element in this) {
