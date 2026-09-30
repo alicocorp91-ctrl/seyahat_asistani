@@ -15,7 +15,7 @@ dependencies:
   provider: ^6.1.1
   shared_preferences: ^2.2.2
   uuid: ^4.2.1
-  intl: 0.20.2 # ✅ flutter_localizations ile uyumlu
+  intl: ^0.20.3
   flutter_local_notifications: ^17.1.2
   timezone: ^0.9.4
 
