@@ -70,10 +70,10 @@ class AppProvider extends ChangeNotifier {
       final isFirstLaunch = _prefs!.getBool(_keyIsFirstLaunch) ?? true;
 
       if (isFirstLaunch) {
-        // İlk açılış: flag'i false yap, gezileri temizle
+        // İlk açılışta yalnızca kurulum işaretini yaz. Eski sürümden
+        // gelen verileri silmek kullanıcı seyahatlerini kaybetmesine yol açar.
         await _prefs!.setBool(_keyIsFirstLaunch, false);
-        await _prefs!.remove(_keyTrips); // Varsa eski veriyi sil
-        debugPrint('✅ İlk kurulum: temiz ekran gösteriliyor');
+        debugPrint('✅ İlk kurulum tamamlandı');
       }
 
       await _loadAllData();
@@ -335,6 +335,16 @@ class AppProvider extends ChangeNotifier {
     required DateTime startDate,
     required DateTime endDate,
   }) async {
+    final cleanName = name.trim();
+    final cleanFrom = fromLocation.trim();
+    final cleanTo = toLocation.trim();
+    if (cleanName.length < 2 || cleanFrom.isEmpty || cleanTo.isEmpty) {
+      throw ArgumentError('Seyahat adı ve konumlar doldurulmalıdır.');
+    }
+    if (endDate.isBefore(startDate)) {
+      throw ArgumentError('Bitiş tarihi başlangıç tarihinden önce olamaz.');
+    }
+
     final filteredItems = _allItems
         .where((item) => item.isVisibleFor(
               gender: gender,
@@ -362,9 +372,9 @@ class AppProvider extends ChangeNotifier {
 
     final trip = Trip(
       id: _uuid.v4(),
-      name: name,
-      fromLocation: fromLocation,
-      toLocation: toLocation,
+      name: cleanName,
+      fromLocation: cleanFrom,
+      toLocation: cleanTo,
       gender: gender,
       season: season,
       transport: transport,
@@ -383,6 +393,23 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
 
     await _saveTrips();
+
+    // Seyahat oluşturulurken planlanmış hazırlık bildirimlerini de kur.
+    // Böylece bildirimler yalnızca hazırlık ekranı açıldıktan sonra değil,
+    // seyahat oluşturulduğu anda aktif olur.
+    await Future.wait(
+      trip.preTripPreparations
+          .where((prep) =>
+              prep.scheduledDate != null && prep.isNotificationEnabled &&
+              !trip.completedPreTripPreparations.contains(prep.id))
+          .map((prep) => _notificationService.scheduleNotification(
+                id: (trip.id + prep.id).hashCode,
+                title: 'Hazırlık Hatırlatıcısı',
+                body: '${prep.name} zamanı geldi!',
+                scheduledDate: prep.scheduledDate!,
+                payload: trip.id,
+              )),
+    );
     return trip;
   }
 
