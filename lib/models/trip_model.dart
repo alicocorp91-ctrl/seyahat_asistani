@@ -81,8 +81,10 @@ class Trip {
 
   // ─── Computed Properties ────────────────────────────────────────────────────
 
-  /// Gün sayısı (başlangıç günü dahil)
-  int get days => endDate.difference(startDate).inDays + 1;
+  /// Gün sayısı (başlangıç günü dahil). Geçersiz tarih aralığı 1 gün kabul edilir.
+  int get days => endDate.isBefore(startDate)
+      ? 1
+      : endDate.difference(startDate).inDays + 1;
 
   /// Paketlenen eşya sayısı
   int get packedCount => items.where((i) => i.isPacked).length;
@@ -96,11 +98,13 @@ class Trip {
   /// Seyahate başlayana kadar kalan süre
   Duration get timeUntilStart => startDate.difference(DateTime.now());
 
-  /// Seyahat başladı mı?
-  bool get hasStarted => DateTime.now().isAfter(startDate);
+  /// Seyahat başladı mı? Tam başlangıç anı da başlamış kabul edilir.
+  bool get hasStarted => !DateTime.now().isBefore(startDate);
 
-  /// Seyahat bitti mi?
-  bool get hasEnded => DateTime.now().isAfter(endDate);
+  /// Seyahat bitti mi? Bitiş tarihi gün sonu kabul edilir.
+  bool get hasEnded => DateTime.now().isAfter(
+        DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59, 999),
+      );
 
   /// Seyahat devam ediyor mu?
   bool get isOngoing => hasStarted && !hasEnded;

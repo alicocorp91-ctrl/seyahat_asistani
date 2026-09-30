@@ -1,17 +1,27 @@
-# seyahat_asistani
+# Seyahat Asistanı
 
-A new Flutter project.
+Seyahat öncesi valiz hazırlığı, ev kontrolleri ve yapılacaklar listenizi tek yerde yönetmenizi sağlayan Flutter uygulaması.
 
-## Getting Started
+## Özellikler
 
-This project is a starting point for a Flutter application.
+- Seyahate göre kişiselleştirilmiş eşya listesi
+- Cinsiyet, mevsim, ulaşım ve yurt içi/yurt dışı filtreleri
+- Valiz, ev kontrolü ve seyahat öncesi hazırlık takibi
+- Hazırlıklar için planlanabilir yerel bildirimler
+- Özel eşya, kontrol ve hazırlık ekleme
+- Seyahat bazlı ilerleme göstergeleri
+- Koyu tema ve tema seçenekleri
+- Verilerin cihazda kalıcı saklanması
 
-A few resources to get you started if this is your first Flutter project:
+## Geliştirme
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+Gereksinimler: Flutter SDK ve Dart SDK.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```bash
+flutter pub get
+flutter analyze
+flutter test
+flutter run
+```
+
+Uygulama Türkçe (`tr_TR`) olarak çalışır ve dikey ekran yönünü kullanır.
